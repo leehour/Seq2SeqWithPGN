@@ -69,5 +69,6 @@ params = {
     'dec_units':256,
     'attn_units':512,
     'batch_size':32,
+    'model_dir':checkpoint_dir
 
 }
