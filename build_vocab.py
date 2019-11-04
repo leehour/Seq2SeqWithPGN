@@ -1,7 +1,7 @@
 from collections import defaultdict
 
-from config import sentences_path, w2v_bin_path
-from utils.data_utils import read_lines
+from config import sentences_path, w2v_bin_path, vocab_path
+from utils.data_utils import read_lines, save_word_dict
 
 
 def generate_vocab(sentence_path, min_count=0, lower=False, sort=True):
@@ -26,10 +26,5 @@ def generate_vocab(sentence_path, min_count=0, lower=False, sort=True):
 
 
 if __name__ == '__main__':
-    vocab, reverse_vocab = generate_vocab(sentences_path, w2v_bin_path, sort=False)
-    # print(len(vocab))
-    # print(type(vocab))
-    # print(vocab)
-    print(len(reverse_vocab))
-    print(type(reverse_vocab))
-    print(reverse_vocab)
+    vocab, reverse_vocab = generate_vocab(sentences_path)
+    save_word_dict(vocab, vocab_path)

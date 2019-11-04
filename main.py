@@ -5,15 +5,17 @@ from gensim.models import KeyedVectors
 
 from config import train_seg_merge_path, test_seg_merge_path, w2v_bin_path, checkpoint_dir, \
     result_path, embedding_size, max_words_size, BATCH_SIZE, dataset_num, units, params, EPOCHS, open_bigru, \
-    max_input_size, max_target_size
+    max_input_size, max_target_size, vocab_path, train_seg_x_path, train_seg_target_path
 from sklearn.model_selection import train_test_split
 import numpy as np
 import tensorflow as tf
 import time
 import os
 
+from entity.vocab import Vocab
+from pgn_model import PGN
 from seq2seq_model import Encoder, Decoder
-from utils.embedding_gen import get_embedding
+from utils.embedding_gen import get_embedding, get_embedding_pgn
 
 
 def preprocess_word(w):
@@ -141,86 +143,92 @@ def predict_report(sentence, tokenizer_input, tokenizer_target, encoder, decoder
 
 if __name__ == '__main__':
 
-    data_train_merge = pd.read_csv(train_seg_merge_path)
-    data_test_merge = pd.read_csv(test_seg_merge_path)
+    # data_train_merge = pd.read_csv(train_seg_merge_path)
+    # data_test_merge = pd.read_csv(test_seg_merge_path)
+    #
+    # # load 词向量模型
+    # model = KeyedVectors.load_word2vec_format(w2v_bin_path, binary=True)
+    #
+    # # 添加<start><end>
+    # data_train_merge['input'] = data_train_merge['input'].apply(preprocess_word).copy()
+    # data_train_merge['Report'] = data_train_merge['Report'].apply(preprocess_word).copy()
+    #
+    # input_data = data_train_merge['input'].apply(str).values.tolist()
+    # target_data = data_train_merge['Report'].apply(str).values.tolist()
+    #
+    # tensor_input, word_index_input, tokenizer_input = tokenize(input_data, max_input_size)
+    # tensor_target, word_index_target, tokenizer_target = tokenize(target_data, max_target_size)
+    #
+    # max_length_targ, max_length_inp = max_length(tensor_target), max_length(tensor_input)
+    #
+    # # 构造embedding matrix
+    # encoder_embedding, decoder_embedding = get_embedding(word_index_input, word_index_target, model, embed_size=embedding_size)
+    #
+    # # Creating training and validation sets using an 80-20 split
+    # input_tensor_train, input_tensor_val, target_tensor_train, target_tensor_val = \
+    #     train_test_split(tensor_input[:dataset_num], tensor_target[:dataset_num], test_size=0.2)
+    #
+    # BUFFER_SIZE = len(input_tensor_train)
+    # steps_per_epoch = len(input_tensor_train) // BATCH_SIZE
+    # embedding_dim = embedding_size
+    # vocab_inp_size = len(word_index_input) + 1
+    # vocab_tar_size = len(word_index_target) + 1
+    #
+    # # 构造训练数据集
+    # dataset = tf.data.Dataset.from_tensor_slices((input_tensor_train, target_tensor_train)).shuffle(BUFFER_SIZE)
+    # dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
+    #
+    # encoder = Encoder(vocab_inp_size, embedding_dim, units, BATCH_SIZE, encoder_embedding, open_bigru)
+    # decoder = Decoder(vocab_tar_size, embedding_dim, units, BATCH_SIZE, decoder_embedding)
+    #
+    # # optimizer = tf.keras.optimizers.Adam()
+    # optimizer = tf.keras.optimizers.Adagrad(params['learning_rate'],
+    #                                         initial_accumulator_value=params['adagrad_init_acc'],
+    #                                         clipnorm=params['max_grad_norm'])
+    # loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
+    #
+    # checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+    # checkpoint = tf.train.Checkpoint(optimizer=optimizer,
+    #                                  encoder=encoder,
+    #                                  decoder=decoder)
+    #
+    # for epoch in range(EPOCHS):
+    #     start = time.time()
+    #
+    #     enc_hidden = encoder.initialize_hidden_state()
+    #     total_loss = 0
+    #
+    #     for (batch, (inp, targ)) in enumerate(dataset.take(steps_per_epoch)):
+    #         batch_loss = train_step(inp, targ, enc_hidden, loss_object, encoder, decoder, tokenizer_target, optimizer)
+    #         total_loss += batch_loss
+    #
+    #         if batch % 100 == 0:
+    #             print('Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1, batch, batch_loss.numpy()))
+    #     # saving (checkpoint) the model every 2 epochs
+    #     if (epoch + 1) % 2 == 0:
+    #         checkpoint.save(file_prefix=checkpoint_prefix)
+    #
+    #     print('Epoch {} Loss {:.4f}'.format(epoch + 1, total_loss / steps_per_epoch))
+    #     print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
+    #
+    # # 此处预测训练集Reports
+    # predict_train_reports = []
+    # for sentence in data_train_merge['input'][:5]:
+    #     result = predict_report(sentence, tokenizer_input, tokenizer_target, encoder, decoder, max_length_inp,
+    #                             max_length_targ)
+    #     predict_train_reports.append(result)
+    # print(predict_train_reports)
+    #
+    # # 此处预测测试集Reports
+    # data_test_merge['Report'] = data_test_merge[:20].apply(lambda x: predict_report(x['input'], tokenizer_input,
+    #                                                                                 tokenizer_target, encoder, decoder,
+    #                                                                                 max_length_inp,
+    #                                                                                 max_length_targ), axis=1)
+    # # data_test_merge['Report'] = data_test_merge['input'][:100].apply(predict_report)
+    # data_test_merge.to_csv(result_path, index=False)
 
-    # load 词向量模型
-    model = KeyedVectors.load_word2vec_format(w2v_bin_path, binary=True)
-
-    # 添加<start><end>
-    data_train_merge['input'] = data_train_merge['input'].apply(preprocess_word).copy()
-    data_train_merge['Report'] = data_train_merge['Report'].apply(preprocess_word).copy()
-
-    input_data = data_train_merge['input'].apply(str).values.tolist()
-    target_data = data_train_merge['Report'].apply(str).values.tolist()
-
-    tensor_input, word_index_input, tokenizer_input = tokenize(input_data, max_input_size)
-    tensor_target, word_index_target, tokenizer_target = tokenize(target_data, max_target_size)
-
-    max_length_targ, max_length_inp = max_length(tensor_target), max_length(tensor_input)
-
-    # 构造embedding matrix
-    encoder_embedding, decoder_embedding = get_embedding(word_index_input, word_index_target, model, embed_size=embedding_size)
-
-    # Creating training and validation sets using an 80-20 split
-    input_tensor_train, input_tensor_val, target_tensor_train, target_tensor_val = \
-        train_test_split(tensor_input[:dataset_num], tensor_target[:dataset_num], test_size=0.2)
-
-    BUFFER_SIZE = len(input_tensor_train)
-    steps_per_epoch = len(input_tensor_train) // BATCH_SIZE
-    embedding_dim = embedding_size
-    vocab_inp_size = len(word_index_input) + 1
-    vocab_tar_size = len(word_index_target) + 1
-
-    # 构造训练数据集
-    dataset = tf.data.Dataset.from_tensor_slices((input_tensor_train, target_tensor_train)).shuffle(BUFFER_SIZE)
-    dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
-
-    encoder = Encoder(vocab_inp_size, embedding_dim, units, BATCH_SIZE, encoder_embedding, open_bigru)
-    decoder = Decoder(vocab_tar_size, embedding_dim, units, BATCH_SIZE, decoder_embedding)
-
-    # optimizer = tf.keras.optimizers.Adam()
-    optimizer = tf.keras.optimizers.Adagrad(params['learning_rate'],
-                                            initial_accumulator_value=params['adagrad_init_acc'],
-                                            clipnorm=params['max_grad_norm'])
-    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
-
-    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
-    checkpoint = tf.train.Checkpoint(optimizer=optimizer,
-                                     encoder=encoder,
-                                     decoder=decoder)
-
-    for epoch in range(EPOCHS):
-        start = time.time()
-
-        enc_hidden = encoder.initialize_hidden_state()
-        total_loss = 0
-
-        for (batch, (inp, targ)) in enumerate(dataset.take(steps_per_epoch)):
-            batch_loss = train_step(inp, targ, enc_hidden, loss_object, encoder, decoder, tokenizer_target, optimizer)
-            total_loss += batch_loss
-
-            if batch % 100 == 0:
-                print('Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1, batch, batch_loss.numpy()))
-        # saving (checkpoint) the model every 2 epochs
-        if (epoch + 1) % 2 == 0:
-            checkpoint.save(file_prefix=checkpoint_prefix)
-
-        print('Epoch {} Loss {:.4f}'.format(epoch + 1, total_loss / steps_per_epoch))
-        print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
-
-    # 此处预测训练集Reports
-    predict_train_reports = []
-    for sentence in data_train_merge['input'][:5]:
-        result = predict_report(sentence, tokenizer_input, tokenizer_target, encoder, decoder, max_length_inp,
-                                max_length_targ)
-        predict_train_reports.append(result)
-    print(predict_train_reports)
-
-    # 此处预测测试集Reports
-    data_test_merge['Report'] = data_test_merge[:20].apply(lambda x: predict_report(x['input'], tokenizer_input,
-                                                                                    tokenizer_target, encoder, decoder,
-                                                                                    max_length_inp,
-                                                                                    max_length_targ), axis=1)
-    # data_test_merge['Report'] = data_test_merge['input'][:100].apply(predict_report)
-    data_test_merge.to_csv(result_path, index=False)
+    w2v_model = KeyedVectors.load_word2vec_format(w2v_bin_path, binary=True)
+    vocab = Vocab(vocab_path, params['vocab_size'])
+    encoder_embedding, decoder_embedding = get_embedding_pgn(vocab, train_seg_x_path, train_seg_target_path, w2v_model, params['embedding_dim'])
+    print(encoder_embedding.shape)
+    print(decoder_embedding.shape)

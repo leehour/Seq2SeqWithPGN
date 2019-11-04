@@ -35,3 +35,9 @@ def read_lines(path):
         for line in f:
             lines.append(line.strip())
     return lines
+
+
+def save_word_dict(dict_data, vocab_path):
+    with open(vocab_path, 'w', encoding='utf-8') as f:
+        for k, v in dict_data.items():
+            f.write('%s\t%d\n' % (k, v))

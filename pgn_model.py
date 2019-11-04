@@ -37,4 +37,22 @@ class PGN(tf.keras.Model):
             p_gens.append(p_gen)
         final_dists = _calc_final_dist(enc_extended_inp, predictions, attentions, p_gens, batch_oov_len,
                                        self.params["vocab_size"], self.params["batch_size"])
-        return final_dists
+        return tf.stack(final_dists, 1), dec_hidden
+
+
+if __name__ == '__main__':
+    encoder = Encoder(vocab_size=25216, embedding_dim=256, enc_units=1024, batch_sz=64)
+    sample_hidden = encoder.initialize_hidden_state()
+    example_input_batch = tf.ones(shape=(64, 88), dtype=tf.int32)
+    sample_output, sample_hidden = encoder(example_input_batch, sample_hidden)
+    print('Encoder output shape: (batch size, sequence length, units) {}'.format(sample_output.shape))
+    print('Encoder Hidden state shape: (batch size, units) {}'.format(sample_hidden.shape))
+
+    attention_layer = BahdanauAttention(128)
+    attention_weights, attention_result = attention_layer(sample_hidden, sample_output)
+    print("Attention result shape: (batch size, units) {}".format(attention_result.shape))
+    print("Attention weights shape: (batch_size, sequence_length, 1) {}".format(attention_weights.shape))
+
+    decoder = Decoder(vocab_size=13053, embedding_dim=256, dec_units=1024, batch_sz=64)
+    sample_decoder_output, _, _ = decoder(tf.random.uniform((64, 1)), sample_hidden, sample_output)
+    print('Decoder output shape: (batch_size, vocab size) {}'.format(sample_decoder_output.shape))

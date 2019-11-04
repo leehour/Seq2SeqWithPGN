@@ -1,19 +1,14 @@
 from gensim.models import KeyedVectors
 from gensim.models.word2vec import Word2Vec
 from gensim.models.word2vec import LineSentence
+import tensorflow as tf
 
 from config import w2v_bin_path, \
     train_seg_x_path, train_seg_target_path, test_seg_x_path, w2v_output_path, \
-    sentences_path, embedding_size
-from utils.data_utils import dump_pkl, load_pkl
-
-
-def read_lines(path):
-    lines = []
-    with open(path, mode='r', encoding='utf-8') as f:
-        for line in f:
-            lines.append(line.strip())
-    return lines
+    sentences_path, embedding_size, vocab_path, params
+from entity.vocab import Vocab
+from utils.data_utils import dump_pkl, load_pkl, read_lines
+from utils.embedding_gen import get_embedding, get_embedding_pgn
 
 
 def extract_sentence(train_seg_x_path, train_seg_target_path, test_seg_x_path, col_sep='\t'):
@@ -49,12 +44,12 @@ def build(train_seg_x_path, train_seg_target_path, test_seg_x_path, w2v_output, 
     #
     # print('train w2v model...')
     # # train model
-    # w2v = Word2Vec(sg=1, sentences=LineSentence(sentence_path),
+    # model = Word2Vec(sg=1, sentences=LineSentence(sentence_path),
     #                size=embedding_size, window=5, min_count=min_count, iter=40)
-    # w2v.wv.save_word2vec_format(w2v_bin_path, binary=True)
+    # model.wv.save_word2vec_format(w2v_bin_path, binary=True)
     # print("save %s ok." % w2v_bin_path)
     # # test
-    # sim = w2v.wv.similarity('奔驰', '宝马')
+    # sim = model.wv.similarity('奔驰', '宝马')
     # print('奔驰 vs 宝马 similarity score:', sim)
 
     model = KeyedVectors.load_word2vec_format(w2v_bin_path, binary=True)
