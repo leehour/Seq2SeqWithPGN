@@ -112,7 +112,6 @@ def example_generator(filenames_1, filenames_2, vocab_path, vocab_size, max_enc_
     dataset_1 = tf.data.TextLineDataset(filenames_1)
     dataset_2 = tf.data.TextLineDataset(filenames_2)
 
-    print(dataset_1)
     train_dataset = tf.data.Dataset.zip((dataset_1, dataset_2))
     if mode == "train":
         train_dataset = train_dataset.shuffle(10, reshuffle_each_iteration=True).repeat()

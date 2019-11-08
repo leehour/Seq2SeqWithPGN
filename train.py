@@ -18,8 +18,6 @@ def train_seq2seq(params):
     vocab = Vocab(vocab_path, params['vocab_size'])
     encoder_embedding, decoder_embedding = get_embedding_pgn(vocab, train_seg_x_path, train_seg_target_path, w2v_model,
                                                              params['embedding_dim'])
-    print(encoder_embedding.shape)
-    print(decoder_embedding.shape)
 
     tf.compat.v1.logging.info("Building the model ...")
     model = PGN(params, encoder_embedding, decoder_embedding)
