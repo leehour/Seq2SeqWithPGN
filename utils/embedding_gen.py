@@ -47,6 +47,8 @@ def get_text_vocab(train_seg_x_path, train_seg_target_path):
     print('read %s...' % train_seg_target_path)
     lines_target = read_lines(train_seg_target_path)
 
+    print('train_x lines: %d' %len(lines_train))
+    print('train_target lines: %d' %len(lines_target))
     train_word_set = set()
     for sentence in lines_train:
         for word in sentence.split():
@@ -61,13 +63,11 @@ def get_text_vocab(train_seg_x_path, train_seg_target_path):
     return train_word_set, target_word_set
 
 
-
-
 def get_embedding_pgn(vocab, train_seg_x_path, train_seg_target_path, model, embed_size=256):
     train_word, target_word = get_text_vocab(train_seg_x_path, train_seg_target_path)
 
-    num_input_en = vocab.size() + 1
-    # num_input_en = min(max_words_size, len(word_index_input))
+    num_input_en = vocab.size()
+    # num_input_en = min(vocab.size(), len(train_word))
     encoder_embedding = np.zeros((num_input_en, embed_size))
     for word in train_word:
         word_id_en = vocab.word_to_id(word)
@@ -77,8 +77,8 @@ def get_embedding_pgn(vocab, train_seg_x_path, train_seg_target_path, model, emb
             word_vec = model.word_vec(word)
         encoder_embedding[word_id_en] = word_vec
 
-    num_input_de = vocab.size() + 1
-    # num_input_de = min(max_words_size, len(word_index_target))
+    num_input_de = vocab.size()
+    # num_input_de = min(vocab.size(), len(target_word))
     decoder_embedding = np.zeros((num_input_de, embed_size))
     for word in target_word:
         word_id_de = vocab.word_to_id(word)
@@ -89,11 +89,10 @@ def get_embedding_pgn(vocab, train_seg_x_path, train_seg_target_path, model, emb
         decoder_embedding[word_id_de] = word_vec
     return encoder_embedding, decoder_embedding
 
+
 if __name__ == '__main__':
     train_seg_x_path = os.path.join(os.path.abspath('..'), 'datasets', 'train_seg_x.csv')
     # os.path.join(os.path.abspath('..'), '/datasets', 'train_seg_x.csv')
     train_seg_target_path = os.path.join(os.path.abspath('..'), 'datasets', 'train_seg_target.csv')
     train_word, target_word = get_text_vocab(train_seg_x_path, train_seg_target_path)
-    for word in train_word:
-        print(word)
-        break
+    print(train_word)

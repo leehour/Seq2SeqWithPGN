@@ -143,21 +143,21 @@ def predict_report(sentence, tokenizer_input, tokenizer_target, encoder, decoder
 
 if __name__ == '__main__':
 
-    # data_train_merge = pd.read_csv(train_seg_merge_path)
-    # data_test_merge = pd.read_csv(test_seg_merge_path)
+    data_train_merge = pd.read_csv(train_seg_merge_path)
+    data_test_merge = pd.read_csv(test_seg_merge_path)
+
+    # load 词向量模型
+    model = KeyedVectors.load_word2vec_format(w2v_bin_path, binary=True)
+
+    # 添加<start><end>
+    data_train_merge['input'] = data_train_merge['input'].apply(preprocess_word).copy()
+    data_train_merge['Report'] = data_train_merge['Report'].apply(preprocess_word).copy()
+
+    input_data = data_train_merge['input'].apply(str).values.tolist()
+    target_data = data_train_merge['Report'].apply(str).values.tolist()
     #
-    # # load 词向量模型
-    # model = KeyedVectors.load_word2vec_format(w2v_bin_path, binary=True)
-    #
-    # # 添加<start><end>
-    # data_train_merge['input'] = data_train_merge['input'].apply(preprocess_word).copy()
-    # data_train_merge['Report'] = data_train_merge['Report'].apply(preprocess_word).copy()
-    #
-    # input_data = data_train_merge['input'].apply(str).values.tolist()
-    # target_data = data_train_merge['Report'].apply(str).values.tolist()
-    #
-    # tensor_input, word_index_input, tokenizer_input = tokenize(input_data, max_input_size)
-    # tensor_target, word_index_target, tokenizer_target = tokenize(target_data, max_target_size)
+    tensor_input, word_index_input, tokenizer_input = tokenize(input_data, max_input_size)
+    tensor_target, word_index_target, tokenizer_target = tokenize(target_data, max_target_size)
     #
     # max_length_targ, max_length_inp = max_length(tensor_target), max_length(tensor_input)
     #
@@ -165,18 +165,18 @@ if __name__ == '__main__':
     # encoder_embedding, decoder_embedding = get_embedding(word_index_input, word_index_target, model, embed_size=embedding_size)
     #
     # # Creating training and validation sets using an 80-20 split
-    # input_tensor_train, input_tensor_val, target_tensor_train, target_tensor_val = \
-    #     train_test_split(tensor_input[:dataset_num], tensor_target[:dataset_num], test_size=0.2)
+    input_tensor_train, input_tensor_val, target_tensor_train, target_tensor_val = \
+        train_test_split(tensor_input[:dataset_num], tensor_target[:dataset_num], test_size=0.2)
     #
-    # BUFFER_SIZE = len(input_tensor_train)
-    # steps_per_epoch = len(input_tensor_train) // BATCH_SIZE
+    BUFFER_SIZE = len(input_tensor_train)
+    steps_per_epoch = len(input_tensor_train) // BATCH_SIZE
     # embedding_dim = embedding_size
     # vocab_inp_size = len(word_index_input) + 1
     # vocab_tar_size = len(word_index_target) + 1
     #
     # # 构造训练数据集
-    # dataset = tf.data.Dataset.from_tensor_slices((input_tensor_train, target_tensor_train)).shuffle(BUFFER_SIZE)
-    # dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
+    dataset = tf.data.Dataset.from_tensor_slices((input_tensor_train, target_tensor_train)).shuffle(BUFFER_SIZE)
+    dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
     #
     # encoder = Encoder(vocab_inp_size, embedding_dim, units, BATCH_SIZE, encoder_embedding, open_bigru)
     # decoder = Decoder(vocab_tar_size, embedding_dim, units, BATCH_SIZE, decoder_embedding)
@@ -192,14 +192,15 @@ if __name__ == '__main__':
     #                                  encoder=encoder,
     #                                  decoder=decoder)
     #
-    # for epoch in range(EPOCHS):
-    #     start = time.time()
-    #
-    #     enc_hidden = encoder.initialize_hidden_state()
-    #     total_loss = 0
-    #
-    #     for (batch, (inp, targ)) in enumerate(dataset.take(steps_per_epoch)):
-    #         batch_loss = train_step(inp, targ, enc_hidden, loss_object, encoder, decoder, tokenizer_target, optimizer)
+    for epoch in range(EPOCHS):
+        start = time.time()
+
+        # enc_hidden = encoder.initialize_hidden_state()
+        total_loss = 0
+
+        for (batch, (inp, targ)) in enumerate(dataset.take(steps_per_epoch)):
+            print(inp.shape)
+            # batch_loss = train_step(inp, targ, enc_hidden, loss_object, encoder, decoder, tokenizer_target, optimizer)
     #         total_loss += batch_loss
     #
     #         if batch % 100 == 0:

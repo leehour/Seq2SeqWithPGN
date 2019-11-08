@@ -22,7 +22,7 @@ class Vocab:
 
                 word = line[0]
                 if word in [SENTENCE_START, SENTENCE_END, UNKNOWN_TOKEN, PAD_TOKEN, START_DECODING, STOP_DECODING]:
-                    raise Exception(r'Invalid word: %s' % w)
+                    raise Exception(r'Invalid word: %s' % word)
 
                 if word in self.word2id:
                     continue
