@@ -42,6 +42,7 @@ checkpoint_dir = os.path.join(os.path.abspath('./'), 'training_checkpoints')
 
 # result path
 result_path = os.path.join(os.path.abspath('./'), 'datasets', 'result.csv')
+test_save_dir = os.path.join(os.path.abspath('./'), 'datasets', 'result_pgn.txt')
 
 embedding_size = 256
 
@@ -71,6 +72,11 @@ params = {
     "max_enc_len": 500,
     "max_dec_len": 100,
     "mode": "train",
-    "checkpoints_save_steps": 10000
+    "checkpoints_save_steps": 10000,
+    "max_steps": 10000,
+    "num_to_test": 5,
+    "test_save_dir": test_save_dir,
+    "vocab_path": vocab_path,
+    "beam_size": 4
 
 }

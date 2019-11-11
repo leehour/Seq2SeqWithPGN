@@ -30,11 +30,17 @@ class Encoder(tf.keras.Model):
 
         return output, state
 
-    def initialize_hidden_state(self):
-        if self.use_bigru:
-            return tf.zeros((self.batch_sz, 2 * self.enc_units))
+    def initialize_hidden_state(self, test_model):
+        if test_model:
+            if self.use_bigru:
+                return tf.zeros((1, 2 * self.enc_units))
+            else:
+                return tf.zeros((1, self.enc_units))
         else:
-            return tf.zeros((self.batch_sz, self.enc_units))
+            if self.use_bigru:
+                return tf.zeros((self.batch_sz, 2 * self.enc_units))
+            else:
+                return tf.zeros((self.batch_sz, self.enc_units))
 
 
 class BahdanauAttention(tf.keras.Model):

@@ -2,7 +2,7 @@ import tensorflow as tf
 from gensim.models import KeyedVectors
 
 from config import vocab_path, params, w2v_bin_path, train_seg_x_path, train_seg_target_path
-from entity.vocab import Vocab
+from entity.vocab import Vocab, STOP_DECODING
 from seq2seq_model import Encoder, BahdanauAttention, Decoder, Pointer
 from utils.calc_dist_utils import _calc_final_dist
 from utils.embedding_gen import get_embedding_pgn
@@ -19,8 +19,8 @@ class PGN(tf.keras.Model):
                                params['batch_size'], embedding_matrix=decoder_embedding_matrix)
         self.pointer = Pointer()
 
-    def call_encoder(self, enc_inp):
-        enc_hidden = self.encoder.initialize_hidden_state()
+    def call_encoder(self, enc_inp, test_model=False):
+        enc_hidden = self.encoder.initialize_hidden_state(test_model)
         enc_output, enc_hidden = self.encoder(enc_inp, enc_hidden)
         return enc_hidden, enc_output
 
@@ -44,7 +44,45 @@ class PGN(tf.keras.Model):
         final_dists = _calc_final_dist(enc_extended_inp, predictions, attentions, p_gens, batch_oov_len,
                                        self.params["vocab_size"], self.params["batch_size"])
         # predictions_shape = (batch_size, dec_len, vocab_size) with dec_len = 1 in pred mode
-        return tf.stack(final_dists, 1), dec_hidden
+        # return tf.stack(final_dists, 1), dec_hidden
+
+        if self.params["mode"] == "train":
+            return tf.stack(final_dists, 1), dec_hidden  # predictions_shape = (batch_size, dec_len, vocab_size) with dec_len = 1 in pred mode
+        else:
+            return tf.stack(final_dists, 1), dec_hidden, context_vector, tf.stack(attentions, 1), tf.stack(p_gens, 1)
+
+    def evaluate(self, enc_output, dec_hidden, enc_extended_inp, dec_inp, batch_oov_len, dec_max_len, vocab):
+        predictions = []
+        attentions = []
+        p_gens = []
+        result = ""
+        context_vector, _ = self.attention(dec_hidden, enc_output)
+        dec_input = tf.reshape(dec_inp, (1, -1))
+        for t in range(dec_max_len):
+            dec_x, pred, dec_hidden = self.decoder(dec_input,
+                                                   dec_hidden,
+                                                   enc_output,
+                                                   context_vector)
+            context_vector, attn = self.attention(dec_hidden, enc_output)
+            p_gen = self.pointer(context_vector, dec_hidden, tf.squeeze(dec_x, axis=1))
+
+        #     predictions.append(pred)
+        #     attentions.append(attn)
+        #     p_gens.append(p_gen)
+
+
+            predicted_id = tf.argmax(pred[0]).numpy()
+            result += vocab.id_to_word(predicted_id) + ' '
+
+            if vocab.id_to_word(predicted_id) == STOP_DECODING:
+                return result
+
+            # the predicted ID is fed back into the model
+            dec_input = tf.expand_dims([predicted_id], 0)
+
+        # final_dists = _calc_final_dist(enc_extended_inp, predictions, attentions, p_gens, batch_oov_len,
+        #                                self.params["vocab_size"], self.params["batch_size"])
+        return result
 
 
 if __name__ == '__main__':
@@ -74,6 +112,6 @@ if __name__ == '__main__':
     pgn = PGN(params, encoder_embedding, decoder_embedding)
     enc_hidden, enc_output = pgn.call_encoder(example_input_batch)
     predictions, _ = pgn(enc_output, sample_hidden, example_input_batch,
-                         tf.random.uniform([32, 2], minval=1, maxval=10,dtype=tf.int32),tf.random.uniform((32, 1)), 6)
+                         tf.random.uniform([32, 2], minval=1, maxval=10, dtype=tf.int32), tf.random.uniform((32, 1)), 6)
 
     print("finished")
