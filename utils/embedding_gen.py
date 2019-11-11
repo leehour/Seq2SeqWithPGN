@@ -41,14 +41,11 @@ def get_embedding(word_index_input, word_index_target, model, embed_size=256):
 
 
 def get_text_vocab(train_seg_x_path, train_seg_target_path):
-    ret = []
-    print('read %s...' % train_seg_x_path)
     lines_train = read_lines(train_seg_x_path)
-    print('read %s...' % train_seg_target_path)
     lines_target = read_lines(train_seg_target_path)
 
-    print('train_x lines: %d' %len(lines_train))
-    print('train_target lines: %d' %len(lines_target))
+    print('train_x lines: %d' % len(lines_train))
+    print('train_target lines: %d' % len(lines_target))
     train_word_set = set()
     for sentence in lines_train:
         for word in sentence.split():

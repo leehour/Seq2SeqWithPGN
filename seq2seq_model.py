@@ -12,10 +12,21 @@ class Encoder(tf.keras.Model):
         self.enc_units = enc_units
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim, weights=[embedding_matrix])
         self.use_bigru = use_bigru
-        self.gru = tf.keras.layers.GRU(self.enc_units,
-                                       return_sequences=True,
-                                       return_state=True,
-                                       recurrent_initializer='glorot_uniform')
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            self.gru = tf.keras.layers.CuDNNGRU(self.enc_units,
+                                                return_sequences=True,
+                                                return_state=True,
+                                                recurrent_initializer='glorot_uniform')
+        else:
+            self.gru = tf.keras.layers.GRU(self.enc_units,
+                                           return_sequences=True,
+                                           return_state=True,
+                                           recurrent_initializer='glorot_uniform')
+        # self.gru = tf.keras.layers.GRU(self.enc_units,
+        #                                return_sequences=True,
+        #                                return_state=True,
+        #                                recurrent_initializer='glorot_uniform')
         if use_bigru:
             self.bigru = tf.keras.layers.Bidirectional(self.gru, merge_mode='concat')
 
@@ -90,10 +101,21 @@ class Decoder(tf.keras.Model):
         self.dec_units = dec_units
         self.use_bigru = use_bigru
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim, weights=[embedding_matrix])
-        self.gru = tf.keras.layers.GRU(self.dec_units,
-                                       return_sequences=True,
-                                       return_state=True,
-                                       recurrent_initializer='glorot_uniform')
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            self.gru = tf.keras.layers.CuDNNGRU(self.dec_units,
+                                                return_sequences=True,
+                                                return_state=True,
+                                                recurrent_initializer='glorot_uniform')
+        else:
+            self.gru = tf.keras.layers.GRU(self.dec_units,
+                                           return_sequences=True,
+                                           return_state=True,
+                                           recurrent_initializer='glorot_uniform')
+        # self.gru = tf.keras.layers.GRU(self.dec_units,
+        #                                return_sequences=True,
+        #                                return_state=True,
+        #                                recurrent_initializer='glorot_uniform')
         if use_bigru:
             self.bigru = tf.keras.layers.Bidirectional(self.gru, merge_mode='concat')
         self.fc = tf.keras.layers.Dense(vocab_size)

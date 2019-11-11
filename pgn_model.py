@@ -46,10 +46,7 @@ class PGN(tf.keras.Model):
         # predictions_shape = (batch_size, dec_len, vocab_size) with dec_len = 1 in pred mode
         # return tf.stack(final_dists, 1), dec_hidden
 
-        if self.params["mode"] == "train":
-            return tf.stack(final_dists, 1), dec_hidden  # predictions_shape = (batch_size, dec_len, vocab_size) with dec_len = 1 in pred mode
-        else:
-            return tf.stack(final_dists, 1), dec_hidden, context_vector, tf.stack(attentions, 1), tf.stack(p_gens, 1)
+        return tf.stack(final_dists, 1), dec_hidden  # predictions_shape = (batch_size, dec_len, vocab_size) with dec_len = 1 in pred mode
 
     def evaluate(self, enc_output, dec_hidden, enc_extended_inp, dec_inp, batch_oov_len, dec_max_len, vocab):
         predictions = []
@@ -66,23 +63,24 @@ class PGN(tf.keras.Model):
             context_vector, attn = self.attention(dec_hidden, enc_output)
             p_gen = self.pointer(context_vector, dec_hidden, tf.squeeze(dec_x, axis=1))
 
-        #     predictions.append(pred)
-        #     attentions.append(attn)
-        #     p_gens.append(p_gen)
+            predictions.append(pred)
+            attentions.append(attn)
+            p_gens.append(p_gen)
 
 
             predicted_id = tf.argmax(pred[0]).numpy()
-            result += vocab.id_to_word(predicted_id) + ' '
-
+            # result += vocab.id_to_word(predicted_id) + ' '
+            #
             if vocab.id_to_word(predicted_id) == STOP_DECODING:
-                return result
-
+                # return result
+                break
             # the predicted ID is fed back into the model
             dec_input = tf.expand_dims([predicted_id], 0)
 
-        # final_dists = _calc_final_dist(enc_extended_inp, predictions, attentions, p_gens, batch_oov_len,
-        #                                self.params["vocab_size"], self.params["batch_size"])
-        return result
+        final_dists = _calc_final_dist(enc_extended_inp, predictions, attentions, p_gens, batch_oov_len,
+                                       self.params["vocab_size"], 1)
+        # return result
+        return final_dists
 
 
 if __name__ == '__main__':

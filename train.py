@@ -5,10 +5,10 @@ from gensim.models import KeyedVectors
 from tqdm import tqdm
 
 from batch import batcher, article_to_ids, get_dec_inp_targ_seqs
-from config import params, vocab_path, w2v_bin_path, train_seg_x_path, train_seg_target_path, test_seg_x_path
+from config import params, vocab_path, w2v_bin_path, train_seg_x_path, train_seg_target_path, test_seg_x_path, log_dir
 from entity.vocab import Vocab, START_DECODING, STOP_DECODING
 from pgn_model import PGN
-from test_helper import beam_decode
+from utils.data_utils import save_result
 from utils.embedding_gen import get_embedding_pgn
 
 
@@ -29,9 +29,8 @@ def train_seq2seq(params):
 
     tf.compat.v1.logging.info("Creating the checkpoint manager")
     logdir = "{}/logdir".format(params["model_dir"])
-    checkpoint_dir = "{}\checkpoint".format(params["model_dir"])
     ckpt = tf.train.Checkpoint(step=tf.Variable(0), PGN=model)
-    ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_dir, max_to_keep=11)
+    ckpt_manager = tf.train.CheckpointManager(ckpt, params['checkpoint_dir'], max_to_keep=11)
 
     ckpt.restore(ckpt_manager.latest_checkpoint)
     if ckpt_manager.latest_checkpoint:
@@ -41,6 +40,10 @@ def train_seq2seq(params):
 
     tf.compat.v1.logging.info("Starting the training ...")
     train_model(model, datasets, params, ckpt, ckpt_manager)
+
+    tf.compat.v1.logging.info("Starting the predicting ...")
+    print("Starting the predicting ...")
+    get_test_pred(model, test_seg_x_path, params)
 
 
 def train_model(model, dataset, params, ckpt, ckpt_manager):
@@ -78,36 +81,38 @@ def train_model(model, dataset, params, ckpt, ckpt_manager):
         return loss
 
     try:
-        for batch in dataset:
-            # print("batch is {}".format(batch))
-            t0 = time.time()
-            loss = train_step(batch[0]["enc_input"], batch[0]["extended_enc_input"], batch[1]["dec_input"],
-                              batch[1]["dec_target"], batch[0]["max_oov_len"])
-            print('Step {}, time {:.4f}, Loss {:.4f}'.format(int(ckpt.step),
-                                                             time.time() - t0,
-                                                             loss.numpy()))
-            if int(ckpt.step) == params["max_steps"]:
-                ckpt_manager.save(checkpoint_number=int(ckpt.step))
-                print("Saved checkpoint for step {}".format(int(ckpt.step)))
-                break
-            if int(ckpt.step) % params["checkpoints_save_steps"] == 0:
-                ckpt_manager.save(checkpoint_number=int(ckpt.step))
-                print("Saved checkpoint for step {}".format(int(ckpt.step)))
-            ckpt.step.assign_add(1)
-            break
+        for epoch in range(params['epochs']):
+            for batch in dataset:
+                # print("batch is {}".format(batch))
+                t0 = time.time()
+                loss = train_step(batch[0]["enc_input"], batch[0]["extended_enc_input"], batch[1]["dec_input"],
+                                  batch[1]["dec_target"], batch[0]["max_oov_len"])
+                print('Epoch {}, Step {}, time {:.4f}, Loss {:.4f}'.format(epoch,
+                                                                           int(ckpt.step),
+                                                                           time.time() - t0,
+                                                                           loss.numpy()))
+                if int(ckpt.step) == params["max_steps"]:
+                    ckpt_manager.save(checkpoint_number=int(ckpt.step))
+                    print("Saved checkpoint for step {}".format(int(ckpt.step)))
+                    break
+                if int(ckpt.step) % params["checkpoints_save_steps"] == 0:
+                    ckpt_manager.save(checkpoint_number=int(ckpt.step))
+                    print("Saved checkpoint for step {}".format(int(ckpt.step)))
+                ckpt.step.assign_add(1)
     except KeyboardInterrupt:
         ckpt_manager.save(int(ckpt.step))
         print("Saved checkpoint for step {}".format(int(ckpt.step)))
 
-    get_test_pred(model, test_seg_x_path, params)
-
 
 def get_test_pred(model, filename, parmas):
+    tf.compat.v1.logging.info("Reading the test data ...")
     dataset = tf.data.TextLineDataset(filename)
+    tf.compat.v1.logging.info("Reading finished ...")
 
     vocab = Vocab(vocab_path, parmas["vocab_size"])
-    # print('vocab is {}'.format(vocab.word2id))
-
+    predict_lines = []
+    # 预测样本数
+    count = 0
     for raw_record in dataset:
         article = raw_record.numpy().decode("utf-8")
 
@@ -138,66 +143,22 @@ def get_test_pred(model, filename, parmas):
 
         enc_hidden, enc_output = model.call_encoder(enc_input, test_model=True)
 
-        result = model.evaluate(enc_output, enc_hidden, enc_input_extend_vocab, dec_input,
-                                        tf.shape(article_oovs)[1], params["max_dec_len"], vocab)
-
+        final_pred = model.evaluate(enc_output, enc_hidden, enc_input_extend_vocab, dec_input,
+                                    tf.shape(article_oovs)[1], params["max_dec_len"], vocab)
+        result = ""
+        for i in range(len(final_pred)):
+            predicted_id = tf.argmax(final_pred[i][0]).numpy()
+            result += vocab.id_to_word(predicted_id) + ' '
+        predict_lines.append(result)
         print(result)
+        count += 1
+        if count == params['test_data_size']:
+            break
+    save_result(parmas['test_save_dir'], predict_lines)
 
-
-def test_model(params):
-    # assert params["mode"].lower() == "test", "change training mode to 'test' or 'eval'"
-    # assert params["beam_size"] == params["batch_size"], "Beam size must be equal to batch_size, change the params"
-
-    print("Building the model ...")
-    w2v_model = KeyedVectors.load_word2vec_format(w2v_bin_path, binary=True)
-    vocab = Vocab(vocab_path, params['vocab_size'])
-    encoder_embedding, decoder_embedding = get_embedding_pgn(vocab, train_seg_x_path, train_seg_target_path, w2v_model,
-                                                             params['embedding_dim'])
-    model = PGN(params, encoder_embedding, decoder_embedding)
-
-    print("Creating the vocab ...")
-    vocab = Vocab(params["vocab_path"], params["vocab_size"])
-
-    print("Creating the batcher ...")
-    datasets = batcher(train_seg_x_path, train_seg_target_path, vocab_path, params)
-
-    print("Creating the checkpoint manager")
-    checkpoint_dir = "{}\checkpoint".format(params["model_dir"])
-    ckpt = tf.train.Checkpoint(step=tf.Variable(0), PGN=model)
-
-    ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_dir, max_to_keep=11)
-
-    ckpt.restore(ckpt_manager.latest_checkpoint)
-    print("Model restored")
-
-    for batch in datasets:
-        yield beam_decode(model, batch, vocab, params)
-
-
-def test_and_save(params):
-    # assert params["test_save_dir"], "provide a dir where to save the results"
-    gen = test_model(params)
-    with tqdm(total=params["num_to_test"], position=0, leave=True) as pbar:
-        for i in range(params["num_to_test"]):
-            trial = next(gen)
-            with open(params["test_save_dir"] + "/article_" + str(i) + ".txt", "w") as f:
-                f.write("article:\n")
-                f.write(trial.text)
-                f.write("\n\nabstract:\n")
-                f.write(trial.abstract)
-            pbar.update(1)
+    print("Predicting finished")
+    tf.compat.v1.logging.info("Finished")
 
 
 if __name__ == '__main__':
-    # train_seq2seq(params)
-    # test_model(params)
-    # test_and_save(params)
-    tf.compat.v1.logging.info("Loading the word2vec model ...")
-    w2v_model = KeyedVectors.load_word2vec_format(w2v_bin_path, binary=True)
-    vocab = Vocab(vocab_path, params['vocab_size'])
-    encoder_embedding, decoder_embedding = get_embedding_pgn(vocab, train_seg_x_path, train_seg_target_path, w2v_model,
-                                                             params['embedding_dim'])
-
-    tf.compat.v1.logging.info("Building the model ...")
-    model = PGN(params, encoder_embedding, decoder_embedding)
-    get_test_pred(model, test_seg_x_path, params)
+    train_seq2seq(params)

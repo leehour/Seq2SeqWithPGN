@@ -41,3 +41,9 @@ def save_word_dict(dict_data, vocab_path):
     with open(vocab_path, 'w', encoding='utf-8') as f:
         for k, v in dict_data.items():
             f.write('%s\t%d\n' % (k, v))
+
+
+def save_result(file_path, line):
+    with open(file_path, 'w', encoding='utf-8') as f:
+        for i in range(len(line)):
+            f.write('%s\n' % line[i])

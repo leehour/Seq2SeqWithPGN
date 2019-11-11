@@ -38,14 +38,15 @@ w2v_output_path = os.path.join(os.path.abspath('./'), 'datasets', 'word2vec.txt'
 w2v_bin_path = os.path.join(os.path.abspath('./'), 'model', 'model.bin')
 
 # checkpoints 存储路径
-checkpoint_dir = os.path.join(os.path.abspath('./'), 'training_checkpoints')
+checkpoint_dir = os.path.join(os.path.abspath('./'), 'training_checkpoints', 'checkpoint')
 
 # result path
 result_path = os.path.join(os.path.abspath('./'), 'datasets', 'result.csv')
 test_save_dir = os.path.join(os.path.abspath('./'), 'datasets', 'result_pgn.txt')
+test_save_dir = os.path.join(os.path.abspath('./'), 'datasets', 'result_pgn.txt')
+log_dir = "./log/"
 
 embedding_size = 256
-
 max_words_size = 30000
 max_input_size = 500
 max_target_size = 100
@@ -57,6 +58,7 @@ open_bigru = False
 EPOCHS = 5
 BATCH_SIZE = 32
 units = 512
+test_data_size = 10
 
 params = {
     'learning_rate': 0.0001,
@@ -68,7 +70,8 @@ params = {
     'dec_units': 256,
     'attn_units': 512,
     'batch_size': 32,
-    'model_dir': checkpoint_dir,
+    "checkpoint_dir": checkpoint_dir,
+    'model_dir': "../model",
     "max_enc_len": 500,
     "max_dec_len": 100,
     "mode": "train",
@@ -77,6 +80,9 @@ params = {
     "num_to_test": 5,
     "test_save_dir": test_save_dir,
     "vocab_path": vocab_path,
-    "beam_size": 4
+    "beam_size": 4,
+    "test_data_size": test_data_size,
+    "log_dir": log_dir,
+    "epochs": 3
 
 }
