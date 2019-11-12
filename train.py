@@ -4,7 +4,7 @@ import tensorflow as tf
 from gensim.models import KeyedVectors
 from tqdm import tqdm
 
-from batch import batcher, article_to_ids, get_dec_inp_targ_seqs
+from batch import batcher, article_to_ids, get_dec_inp_targ_seqs, output_to_words
 from config import params, vocab_path, w2v_bin_path, train_seg_x_path, train_seg_target_path, test_seg_x_path, log_dir
 from entity.vocab import Vocab, START_DECODING, STOP_DECODING
 from pgn_model import PGN
@@ -12,7 +12,7 @@ from utils.data_utils import save_result
 from utils.embedding_gen import get_embedding_pgn
 
 
-def train_seq2seq(params):
+def train_and_predict(params):
     assert params["mode"].lower() == "train", "change training mode to 'train'"
 
     tf.compat.v1.logging.info("Loading the word2vec model ...")
@@ -43,7 +43,7 @@ def train_seq2seq(params):
 
     tf.compat.v1.logging.info("Starting the predicting ...")
     print("Starting the predicting ...")
-    get_test_pred(model, test_seg_x_path, params)
+    get_test_pred(model, test_seg_x_path, params, vocab)
 
 
 def train_model(model, dataset, params, ckpt, ckpt_manager):
@@ -99,17 +99,17 @@ def train_model(model, dataset, params, ckpt, ckpt_manager):
                     ckpt_manager.save(checkpoint_number=int(ckpt.step))
                     print("Saved checkpoint for step {}".format(int(ckpt.step)))
                 ckpt.step.assign_add(1)
+                break
     except KeyboardInterrupt:
         ckpt_manager.save(int(ckpt.step))
         print("Saved checkpoint for step {}".format(int(ckpt.step)))
 
 
-def get_test_pred(model, filename, parmas):
+def get_test_pred(model, filename, parmas, vocab):
     tf.compat.v1.logging.info("Reading the test data ...")
     dataset = tf.data.TextLineDataset(filename)
     tf.compat.v1.logging.info("Reading finished ...")
 
-    vocab = Vocab(vocab_path, parmas["vocab_size"])
     predict_lines = []
     # 预测样本数
     count = 0
@@ -137,18 +137,15 @@ def get_test_pred(model, filename, parmas):
         article_oovs = tf.convert_to_tensor(article_oovs)
         enc_input_extend_vocab = tf.convert_to_tensor(enc_input_extend_vocab)
         enc_input = tf.reshape(enc_input, (1, -1))
-        # dec_input = tf.reshape(dec_input, (1, -1))
+        dec_input = tf.reshape(dec_input, (1, -1))
         article_oovs = tf.reshape(article_oovs, (1, -1))
         enc_input_extend_vocab = tf.reshape(enc_input_extend_vocab, (1, -1))
 
         enc_hidden, enc_output = model.call_encoder(enc_input, test_model=True)
 
-        final_pred = model.evaluate(enc_output, enc_hidden, enc_input_extend_vocab, dec_input,
-                                    tf.shape(article_oovs)[1], params["max_dec_len"], vocab)
-        result = ""
-        for i in range(len(final_pred)):
-            predicted_id = tf.argmax(final_pred[i][0]).numpy()
-            result += vocab.id_to_word(predicted_id) + ' '
+        predict_ids = model.evaluate(enc_output, enc_hidden, enc_input_extend_vocab, dec_input,
+                                     tf.shape(article_oovs)[1], params["max_dec_len"], vocab)
+        result = " ".join(output_to_words(predict_ids, vocab, article_oovs))
         predict_lines.append(result)
         print(result)
         count += 1
@@ -161,4 +158,4 @@ def get_test_pred(model, filename, parmas):
 
 
 if __name__ == '__main__':
-    train_seq2seq(params)
+    train_and_predict(params)

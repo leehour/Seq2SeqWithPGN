@@ -46,16 +46,16 @@ class PGN(tf.keras.Model):
         # predictions_shape = (batch_size, dec_len, vocab_size) with dec_len = 1 in pred mode
         # return tf.stack(final_dists, 1), dec_hidden
 
-        return tf.stack(final_dists, 1), dec_hidden  # predictions_shape = (batch_size, dec_len, vocab_size) with dec_len = 1 in pred mode
+        # predictions_shape = (batch_size, dec_len, vocab_size) with dec_len = 1 in pred mode
+        return tf.stack(final_dists, 1), dec_hidden
 
-    def evaluate(self, enc_output, dec_hidden, enc_extended_inp, dec_inp, batch_oov_len, dec_max_len, vocab):
-        predictions = []
-        attentions = []
-        p_gens = []
-        result = ""
+    def evaluate(self, enc_output, dec_hidden, enc_extended_inp, dec_input, batch_oov_len, dec_max_len, vocab):
+        result = []
         context_vector, _ = self.attention(dec_hidden, enc_output)
-        dec_input = tf.reshape(dec_inp, (1, -1))
         for t in range(dec_max_len):
+            predictions = []
+            attentions = []
+            p_gens = []
             dec_x, pred, dec_hidden = self.decoder(dec_input,
                                                    dec_hidden,
                                                    enc_output,
@@ -67,20 +67,17 @@ class PGN(tf.keras.Model):
             attentions.append(attn)
             p_gens.append(p_gen)
 
+            final_dists = _calc_final_dist(enc_extended_inp, predictions, attentions, p_gens, batch_oov_len,
+                                           self.params["vocab_size"], 1)
+            predicted_id = tf.argmax(final_dists[0][0]).numpy()
 
-            predicted_id = tf.argmax(pred[0]).numpy()
-            # result += vocab.id_to_word(predicted_id) + ' '
-            #
-            if vocab.id_to_word(predicted_id) == STOP_DECODING:
-                # return result
-                break
             # the predicted ID is fed back into the model
             dec_input = tf.expand_dims([predicted_id], 0)
 
-        final_dists = _calc_final_dist(enc_extended_inp, predictions, attentions, p_gens, batch_oov_len,
-                                       self.params["vocab_size"], 1)
-        # return result
-        return final_dists
+            result.append(predicted_id)
+            if vocab.id_to_word(predicted_id) == STOP_DECODING:
+                break
+        return result
 
 
 if __name__ == '__main__':
